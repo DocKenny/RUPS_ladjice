@@ -1,5 +1,6 @@
 import pygame
 import sys
+import styles as st
 
 
 class MainMenu:
@@ -14,10 +15,10 @@ class MainMenu:
         self.selected_option = None
 
         # Colors
-        self.BG_COLOR = (245, 245, 245)
-        self.TEXT_COLOR = (30, 30, 30)
-        self.BUTTON_COLOR = (200, 200, 200)
-        self.BUTTON_HOVER = (160, 160, 160)
+        self.BG_COLOR = st.COLOR_BG
+        self.TEXT_COLOR = st.COLOR_TEXT
+        self.BUTTON_COLOR = st.COLOR_BUTTON
+        self.BUTTON_HOVER = st.COLOR_BUTTON_HOVER
 
         # Button rectangles
         self.start_rect = pygame.Rect(0, 0, 200, 60)
