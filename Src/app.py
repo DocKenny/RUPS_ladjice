@@ -4,6 +4,8 @@ import random
 from board import Board, generate_sequences
 from game import Game
 from quiz import QuizManager
+from question_ui import QuestionCard
+
 
 # --- Config ---
 GRID_SIZE = 10
@@ -38,8 +40,11 @@ class App:
         self.font = pygame.font.SysFont(None, 28)
         self.running = True
 
+        # Polished question UI card
+        self.question_card = QuestionCard(self.screen, width=700)
+
         # make the game (players; Game handles ship placement)
-        self.game = Game(["Player 1", "Player 2"], SEQUENCE_COLORS, ship_lengths=[2,3,5], grid_size=GRID_SIZE)
+        self.game = Game(["Player 1", "Player 2"], SEQUENCE_COLORS, ship_lengths=[2, 3, 5], grid_size=GRID_SIZE)
 
         # set origins so boards draw in the right place
         # (Game created Board objects with origin=(0,0) so update the origins here)
@@ -49,49 +54,67 @@ class App:
         self.quiz = QuizManager()
 
         # UI state
-        self.state = "ASK_QUESTION"
+        self.state = "ASK_QUESTION"  # ASK_QUESTION -> ANSWERING -> (SHOOTING or SHOW_RESULT)
         self.current_question = ""
         self.correct_answer = ""
-        self.user_answer = ""
         self.message = ""
 
+    # --- Quiz flow helpers ---
     def ask_question(self):
         self.current_question, self.correct_answer = self.quiz.get_question()
-        self.user_answer = ""
         self.state = "ANSWERING"
+        # reset the card each time
+        self.question_card.set_input("")
+        self.question_card.clear_feedback()
 
-    def check_answer(self):
-        if self.user_answer.strip().lower() == self.correct_answer.lower():
-            self.state = "SHOOTING"
-            self.message = "Correct! Take your shot."
-        else:
-            self.message = "Incorrect. Turn skipped."
-            self.game.next_turn()
-            self.state = "SHOW_RESULT"
+    def on_correct_answer(self):
+        self.message = "Correct! Take your shot."
+        self.state = "SHOOTING"
 
+    def on_wrong_answer(self):
+        self.message = "Incorrect. Turn skipped."
+        self.game.next_turn()
+        self.state = "SHOW_RESULT"
+
+    # --- Event handling ---
     def handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
+                continue
 
-            elif self.state == "ANSWERING":
+            if self.state == "ANSWERING":
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_RETURN:
-                        self.check_answer()
-                    elif event.key == pygame.K_BACKSPACE:
-                        self.user_answer = self.user_answer[:-1]
-                    else:
-                        self.user_answer += event.unicode
+                    action = self.question_card.handle_key(event)
+                    if action == "submit":
+                        user_answer = self.question_card.input_value.strip()
+                        if user_answer.lower() == self.correct_answer.lower():
+                            self.question_card.set_feedback(True, "Correct! Fire away 🚀")
+                            self.on_correct_answer()
+                        else:
+                            self.question_card.set_feedback(False, "Wrong answer. Turn lost.")
+                            self.on_wrong_answer()
 
-            elif self.state == "SHOOTING" and event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:
-                    pos = event.pos
-                    opponent = self.game.get_opponent()
-                    cell = opponent.board.cell_from_pos(pos)
-                    if cell:
-                        self.message = self.game.process_shot(cell)[0]
-                        self.state = "SHOW_RESULT"
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    action = self.question_card.handle_click(event.pos)
+                    if action == "submit":
+                        user_answer = self.question_card.input_value.strip()
+                        if user_answer.lower() == self.correct_answer.lower():
+                            self.question_card.set_feedback(True, "Correct! Fire away 🚀")
+                            self.on_correct_answer()
+                        else:
+                            self.question_card.set_feedback(False, "Wrong answer. Turn lost.")
+                            self.on_wrong_answer()
 
+            elif self.state == "SHOOTING" and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                pos = event.pos
+                opponent = self.game.get_opponent()
+                cell = opponent.board.cell_from_pos(pos)
+                if cell:
+                    self.message = self.game.process_shot(cell)[0]
+                    self.state = "SHOW_RESULT"
+
+    # --- Drawing helpers ---
     def draw_text_center(self, text, y):
         label = self.font.render(text, True, LABEL_COLOR)
         rect = label.get_rect(center=(WIDTH // 2, y))
@@ -109,19 +132,28 @@ class App:
         player.board.draw(self.screen, show_ships=True)
         opponent.board.draw(self.screen, show_ships=False)
 
-        # Draw UI text based on state
+        # Turn label
         self.draw_text_center(f"Current turn: {player.name}", 30)
 
+        # State-specific UI
         if self.state == "ANSWERING":
-            self.draw_text_center(self.current_question, HEIGHT - 80)
-            self.draw_text_center(self.user_answer, HEIGHT - 50)
+            # Dim background for focus
+            overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 80))
+            self.screen.blit(overlay, (0, 0))
+
+            center = (self.screen.get_width() // 2, self.screen.get_height() // 2)
+            self.question_card.draw(self.current_question, center)
+
         elif self.state == "SHOW_RESULT":
             self.draw_text_center(self.message, HEIGHT - 80)
+
         elif self.state == "SHOOTING":
             self.draw_text_center(self.message, HEIGHT - 80)
 
         pygame.display.flip()
 
+    # --- Main loop ---
     def run(self):
         # Start with a question
         self.ask_question()
