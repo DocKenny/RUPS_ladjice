@@ -16,7 +16,7 @@ if __name__ == "__main__":
             game.run()
             
         elif choice == "multiplayer":
-            from multiplayer_handler import start_multiplayer_game
+            from multiplayer_menu import start_multiplayer_game
             start_multiplayer_game()
             
         elif choice == "quit":
