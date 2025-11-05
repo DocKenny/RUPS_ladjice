@@ -5,7 +5,8 @@ from board import Board, generate_sequences
 from game import Game
 from quiz import QuizManager
 from question_ui import QuestionCard
-
+from hud import TurnHUD
+from toast import StatusToast
 
 # --- Config ---
 GRID_SIZE = 10
@@ -13,12 +14,13 @@ CELL_SIZE = 48
 OUTER_MARGIN = 30
 GAP_BETWEEN_GRIDS = 80
 GRID_PIXELS = GRID_SIZE * CELL_SIZE
+TOP_BAR = 25  # vertical space reserved for the HUD
 
-LEFT_ORIGIN = (OUTER_MARGIN, OUTER_MARGIN)
-RIGHT_ORIGIN = (OUTER_MARGIN + GRID_PIXELS + GAP_BETWEEN_GRIDS, OUTER_MARGIN)
+LEFT_ORIGIN = (OUTER_MARGIN, TOP_BAR + OUTER_MARGIN)
+RIGHT_ORIGIN = (OUTER_MARGIN + GRID_PIXELS + GAP_BETWEEN_GRIDS, TOP_BAR + OUTER_MARGIN)
 
 WIDTH = RIGHT_ORIGIN[0] + GRID_PIXELS + OUTER_MARGIN
-HEIGHT = OUTER_MARGIN + GRID_PIXELS + OUTER_MARGIN
+HEIGHT = TOP_BAR + OUTER_MARGIN + GRID_PIXELS + OUTER_MARGIN
 
 BG_COLOR = (245, 245, 245)
 LABEL_COLOR = (60, 60, 60)
@@ -43,6 +45,12 @@ class App:
         # Polished question UI card
         self.question_card = QuestionCard(self.screen, width=700)
 
+        # Turn/Result HUD
+        self.hud = TurnHUD(self.screen)
+        self.hud.set_status(None, None)
+
+        self.toast = StatusToast(self.screen)
+
         # make the game (players; Game handles ship placement)
         self.game = Game(["Player 1", "Player 2"], SEQUENCE_COLORS, ship_lengths=[2, 3, 5], grid_size=GRID_SIZE)
 
@@ -59,6 +67,9 @@ class App:
         self.correct_answer = ""
         self.message = ""
 
+        # Initialize HUD with current player
+        self.hud.set_player(self.game.get_current_player().name)
+
     # --- Quiz flow helpers ---
     def ask_question(self):
         self.current_question, self.correct_answer = self.quiz.get_question()
@@ -66,14 +77,22 @@ class App:
         # reset the card each time
         self.question_card.set_input("")
         self.question_card.clear_feedback()
+        # refresh HUD for the (potentially new) player
+        self.hud.set_player(self.game.get_current_player().name)
+        self.hud.set_status(None, None)
 
     def on_correct_answer(self):
-        self.message = "Correct! Take your shot."
+        #self.message = "Correct! Take your shot."
+        self.toast.show("Correct! Take your shot.", positive=True)
+        self.hud.set_status(None, None)
         self.state = "SHOOTING"
 
     def on_wrong_answer(self):
-        self.message = "Incorrect. Turn skipped."
+        #self.message = "Incorrect. Turn skipped."
+        self.toast.show("Wrong answer. Turn lost.", positive=False)
+        self.hud.set_status(False, "Skipped")
         self.game.next_turn()
+        self.hud.set_player(self.game.get_current_player().name)
         self.state = "SHOW_RESULT"
 
     # --- Event handling ---
@@ -111,7 +130,16 @@ class App:
                 opponent = self.game.get_opponent()
                 cell = opponent.board.cell_from_pos(pos)
                 if cell:
-                    self.message = self.game.process_shot(cell)[0]
+                    msg, *_ = self.game.process_shot(cell)
+                    #self.message = msg
+
+                    # detect hit/miss from message (fallback if your Game doesn't expose it directly)
+                    lower = msg.lower()
+                    did_hit = ("hit" in lower) and ("miss" not in lower)
+                    self.hud.set_status(did_hit, "Hit!" if did_hit else "Miss!")
+
+                    # after process_shot, turn likely advanced to the next player
+                    self.hud.set_player(self.game.get_current_player().name)
                     self.state = "SHOW_RESULT"
 
     # --- Drawing helpers ---
@@ -126,14 +154,15 @@ class App:
         player = self.game.get_current_player()
         opponent = self.game.get_opponent()
 
+        # HUD on top
+        self.hud.draw()
+        self.toast.draw()
+
         # Draw both boards
         player.board.origin = LEFT_ORIGIN
         opponent.board.origin = RIGHT_ORIGIN
         player.board.draw(self.screen, show_ships=True)
         opponent.board.draw(self.screen, show_ships=False)
-
-        # Turn label
-        self.draw_text_center(f"Current turn: {player.name}", 30)
 
         # State-specific UI
         if self.state == "ANSWERING":
