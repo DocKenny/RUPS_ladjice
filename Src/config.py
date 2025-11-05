@@ -1,0 +1,30 @@
+#board
+GRID_SIZE = 10
+CELL_SIZE = 48
+LINE_WIDTH = 2
+X_MARGIN = 8
+GRID_PIXELS = GRID_SIZE * CELL_SIZE
+
+SHIP_LENGTHS = [2, 3, 5]
+
+#ui barve
+COLOR_BG = (245, 245, 245)
+COLOR_TEXT = (30, 30, 30)
+COLOR_BUTTON = (200, 200, 200)
+COLOR_BUTTON_HOVER = (160, 160, 160)
+
+#board barve
+GRID_COLOR = (30, 30, 30)
+X_COLOR = (200, 40, 40)
+O_COLOR = (40, 120, 200)
+
+#barve ladje
+SEQUENCE_COLORS = [
+    (189, 226, 255),
+    (255, 235, 205),
+    (221, 197, 255),
+]
+
+#network
+DEFAULT_HOST = '0.0.0.0'
+DEFAULT_PORT = 5555
