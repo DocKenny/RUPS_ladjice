@@ -1,4 +1,5 @@
 import pygame
+import random
 
 # --- config ---
 GRID_SIZE = 10
@@ -12,6 +13,51 @@ O_COLOR = (40, 120, 200)
 
 
 GRID_PIXELS = GRID_SIZE * CELL_SIZE
+
+# --- config ---
+GRID_SIZE = 10
+CELL_SIZE = 48
+LINE_WIDTH = 2
+X_MARGIN = 8
+BG_COLOR = (245, 245, 245)
+GRID_COLOR = (30, 30, 30)
+X_COLOR = (200, 40, 40)
+O_COLOR = (40, 120, 200)
+
+
+def generate_sequences(grid_size, lengths, sequence_colors):
+    # Randomly generate ship-like colored sequences.
+    occupied = set()
+    cell_to_color = {}
+
+    for length, color in zip(lengths, sequence_colors):
+        placed = False
+        for _ in range(500):
+            orientation = random.choice(["H", "V"])
+            if orientation == "H":
+                row = random.randint(0, grid_size - 1)
+                col = random.randint(0, grid_size - length)
+                cells = [(row, col + i) for i in range(length)]
+            else:
+                row = random.randint(0, grid_size - length)
+                col = random.randint(0, grid_size - 1)
+                cells = [(row + i, col) for i in range(length)]
+
+            if all(c not in occupied for c in cells):
+                for c in cells:
+                    occupied.add(c)
+                    cell_to_color[c] = color
+                placed = True
+                break
+
+        if not placed:
+            # fallback placement
+            cells = [(0, i) for i in range(length)] if orientation == "H" else [(i, 0) for i in range(length)]
+            for c in cells:
+                occupied.add(c)
+                cell_to_color[c] = color
+
+    return cell_to_color
 
 
 class Board:
