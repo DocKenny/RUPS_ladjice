@@ -12,9 +12,6 @@ class ImageLoader:
             path = os.path.join(self.images_folder, f"ship_{length}.png")
             if os.path.exists(path):
                 self.ship_images[length] = pygame.image.load(path)
-                print(f"[IMAGE] Loaded ship_{length}.png")
-            else:
-                print(f"[WARNING] Missing {path}")
     
     def get_ship_image(self, length):
         return self.ship_images.get(length)

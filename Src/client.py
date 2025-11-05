@@ -1,13 +1,10 @@
 import pygame
 import sys
 import socket
-import json
 import threading
 from board import Board
-from config import (
-    GRID_PIXELS, SEQUENCE_COLORS,
-    COLOR_BG, DEFAULT_PORT
-)
+from config import (GRID_PIXELS, SEQUENCE_COLORS, COLOR_BG, DEFAULT_PORT)
+from network_utils import send_json, receive_json, deserialize_board_state, deserialize_board_ships
 
 # config
 OUTER_MARGIN = 30
@@ -46,14 +43,13 @@ class BattleshipClient:
         self.receive_thread = None
 
         # ui state
-        self.state = "CONNECTING"  # CONNECTING, WAITING, ANSWERING, SHOOTING, SHOW_RESULT, GAME_OVER
+        self.state = "CONNECTING"
         self.message = "Connecting to server..."
         self.current_question = ""
         self.user_answer = ""
         self.can_shoot = False
         self.game_over = False
         self.winner = None
-        
         
     def connect(self):
         try:
@@ -62,7 +58,6 @@ class BattleshipClient:
             self.connected = True
             print(f"[CLIENT] Connected to {self.host}:{self.port}")
             
-            # pridobivaj sporočila v posebaj threadu
             self.receive_thread = threading.Thread(target=self.receive_messages, daemon=True)
             self.receive_thread.start()
             
@@ -73,42 +68,20 @@ class BattleshipClient:
             self.state = "ERROR"
             return False
     
-    #poslji JSON na host/server
     def send_message(self, data):
-        try:
-            message = json.dumps(data) + '\n'
-            self.socket.sendall(message.encode('utf-8'))
-        except Exception as e:
-            print(f"[CLIENT] Error sending message: {e}")
+        if not send_json(self.socket, data):
             self.connected = False
     
-
-    #pridobi sporocilo od host/server
     def receive_messages(self):
         buffer = b''
         while self.connected and self.running:
-            try:
-                chunk = self.socket.recv(1024)
-                if not chunk:
-                    print("[CLIENT] Server disconnected")
-                    self.connected = False
-                    break
-                
-                buffer += chunk
-                
-                # procesiraj vsa sporočila
-                while b'\n' in buffer:
-                    line, buffer = buffer.split(b'\n', 1)
-                    if line:
-                        message = json.loads(line.decode('utf-8'))
-                        self.handle_message(message)
-                        
-            except Exception as e:
-                print(f"[CLIENT] Error receiving message: {e}")
+            msg, buffer = receive_json(self.socket, buffer)
+            if msg is None:
+                print("[CLIENT] Server disconnected")
                 self.connected = False
                 break
+            self.handle_message(msg)
     
-    #procesiraj sporočilo, vsi states
     def handle_message(self, msg):
         msg_type = msg.get('type')
         
@@ -130,7 +103,7 @@ class BattleshipClient:
             self.user_answer = ""
             self.state = "ANSWERING"
             self.message = f"Answer the question: {self.current_question}"
-            print(f"[CLIENT] Question: {self.current_question}")
+
             
         elif msg_type == 'opponent_turn':
             self.state = "WAITING"
@@ -176,50 +149,28 @@ class BattleshipClient:
             self.message = msg['message']
             pygame.time.set_timer(pygame.USEREVENT, 2000, 1)
     
-
-    # server poslje podatke o board-ih, client jih izgradi na svojem rač.
     def initialize_boards(self, msg):
         self.my_board = Board(LEFT_ORIGIN, SEQUENCE_COLORS)
         self.opponent_board = Board(RIGHT_ORIGIN, SEQUENCE_COLORS)
         
-        # board tega rač
-        your_board = msg['your_board']
-        ships_dict = your_board.get('ships', {})
-        cells_with_colors = {}
-        for key, color in ships_dict.items():
-            r, c = map(int, key.split(','))
-            cells_with_colors[(r, c)] = tuple(color)
-        
-        self.my_board.set_cells(cells_with_colors)
-        self.my_board.hits = set(tuple(h) for h in your_board.get('hits', []))
-        self.my_board.misses = set(tuple(m) for m in your_board.get('misses', []))
-        
-        # board drugega rač
-        opponent_board = msg['opponent_board']
-        self.opponent_board.hits = set(tuple(h) for h in opponent_board.get('hits', []))
-        self.opponent_board.misses = set(tuple(m) for m in opponent_board.get('misses', []))
+        deserialize_board_ships(self.my_board, msg['your_board'])
+        deserialize_board_state(self.my_board, msg['your_board'])
+        deserialize_board_state(self.opponent_board, msg['opponent_board'])
     
-
-    # posodabljanje hits/misses
     def update_my_board(self, board_data):
         if self.my_board:
-            self.my_board.hits = set(tuple(h) for h in board_data.get('hits', []))
-            self.my_board.misses = set(tuple(m) for m in board_data.get('misses', []))
+            deserialize_board_state(self.my_board, board_data)
     
     def update_opponent_board(self, board_data):
         if self.opponent_board:
-            self.opponent_board.hits = set(tuple(h) for h in board_data.get('hits', []))
-            self.opponent_board.misses = set(tuple(m) for m in board_data.get('misses', []))
+            deserialize_board_state(self.opponent_board, board_data)
     
-
-    #pygame events
     def handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
                 
             elif event.type == pygame.USEREVENT:
-                #timer da ti pokaze sporocilo
                 if self.state == "SHOW_RESULT":
                     self.state = "WAITING"
                     self.message = "Waiting for your turn..."
@@ -227,7 +178,6 @@ class BattleshipClient:
             elif self.state == "ANSWERING":
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RETURN:
-                        #poslji odgovor serverju
                         self.send_message({
                             'type': 'answer',
                             'answer': self.user_answer
@@ -244,7 +194,6 @@ class BattleshipClient:
                     pos = event.pos
                     cell = self.opponent_board.cell_from_pos(pos)
                     if cell:
-                        # poslji shot serverju
                         self.send_message({
                             'type': 'shot',
                             'cell': list(cell)
@@ -253,7 +202,6 @@ class BattleshipClient:
                         self.message = "Shot sent. Waiting for result..."
                         self.can_shoot = False
     
-    # sredinski text
     def draw_text_center(self, text, y, font=None, color=LABEL_COLOR):
         if font is None:
             font = self.font
@@ -261,15 +209,12 @@ class BattleshipClient:
         rect = label.get_rect(center=(WIDTH // 2, y))
         self.screen.blit(label, rect)
     
-    # glavna draw funkcija za board
     def draw(self):
         self.screen.fill(COLOR_BG)
         
-        #povezovanje
         if self.state in ["CONNECTING", "WAITING", "ERROR"] and not self.my_board:
             self.draw_text_center(self.message, HEIGHT // 2, self.font_large)
         else:
-            # narisi board
             if self.my_board:
                 label = self.font.render(f"{self.player_name}'s Board", True, LABEL_COLOR)
                 self.screen.blit(label, (LEFT_ORIGIN[0], LEFT_ORIGIN[1] - 25))
@@ -280,7 +225,6 @@ class BattleshipClient:
                 self.screen.blit(label, (RIGHT_ORIGIN[0], RIGHT_ORIGIN[1] - 25))
                 self.opponent_board.draw(self.screen, show_ships=False)
             
-            # status
             y_pos = OUTER_MARGIN + GRID_PIXELS + 40
             
             if self.state == "ANSWERING":
