@@ -1,6 +1,6 @@
 # quiz.py
 import random
-
+import gen_questions
 
 class QuizManager:
     def __init__(self):
@@ -11,4 +11,5 @@ class QuizManager:
         ]
 
     def get_question(self):
-        return random.choice(self.questions)
+        # return random.choice(self.questions)
+        return gen_questions.generate_simple_question()

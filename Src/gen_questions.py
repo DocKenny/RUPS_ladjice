@@ -23,7 +23,7 @@ def generate_simple_question():
         answer = num1 // num2
 
     question = f"What is {num1} {operation} {num2}?"
-    return question, answer
+    return question, str(answer) # :)
 
 def generate_multiple_choice_question():
     question, answer = generate_simple_question()
