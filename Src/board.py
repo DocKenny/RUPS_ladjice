@@ -1,5 +1,6 @@
 import pygame
 import random
+from image_loader import ImageLoader
 
 # --- config ---
 GRID_SIZE = 10
@@ -14,16 +15,12 @@ O_COLOR = (40, 120, 200)
 
 GRID_PIXELS = GRID_SIZE * CELL_SIZE
 
-# --- config ---
-GRID_SIZE = 10
-CELL_SIZE = 48
-LINE_WIDTH = 2
-X_MARGIN = 8
-BG_COLOR = (245, 245, 245)
-GRID_COLOR = (30, 30, 30)
-X_COLOR = (200, 40, 40)
-O_COLOR = (40, 120, 200)
+image_loader = None
 
+def init_image_loader():
+    global image_loader
+    if image_loader is None:
+        image_loader = ImageLoader()
 
 def generate_sequences(grid_size, lengths, sequence_colors):
     # Randomly generate ship-like colored sequences.
@@ -128,11 +125,89 @@ class Board:
         radius = CELL_SIZE // 2 - X_MARGIN
         pygame.draw.circle(surface, O_COLOR, (cx, cy), radius, LINE_WIDTH + 2)
 
+    def draw_ship_images(self, surface):
+        if image_loader is None:
+            init_image_loader()
+        
+        ships = self.group_ships()
+        
+        for ship_cells in ships:
+            if not ship_cells:
+                continue
+            
+            ship_length = len(ship_cells)
+            img = image_loader.get_ship_image(ship_length)
+            
+            if img is None:
+                # Fallback
+                for (r, c) in ship_cells:
+                    color = self.cells_with_colors.get((r, c))
+                    if color:
+                        self.draw_cell_fill(surface, r, c, color)
+                continue
+            
+            # orientacija, pozicija
+            ship_cells = sorted(ship_cells)
+            first_cell = ship_cells[0]
+
+            is_horizontal = all(r == first_cell[0] for r, c in ship_cells)
+
+            ox, oy = self.origin
+
+            if is_horizontal:
+                img_resized = pygame.transform.scale(img, (CELL_SIZE, CELL_SIZE * ship_length))
+                img_resized = pygame.transform.rotate(img_resized, -90)
+                x = ox + first_cell[1] * CELL_SIZE
+                y = oy + first_cell[0] * CELL_SIZE
+            else:
+                img_resized = pygame.transform.scale(img, (CELL_SIZE, CELL_SIZE * ship_length))
+                x = ox + first_cell[1] * CELL_SIZE
+                y = oy + first_cell[0] * CELL_SIZE
+
+            surface.blit(img_resized, (x, y))
+
+
+
+    # grupiraj celice v ladje
+    def group_ships(self):
+        visited = set()
+        ships = []
+        
+        for cell in self.cells_with_colors:
+            if cell in visited:
+                continue
+            
+            # najdi povezane celice
+            ship = []
+            color = self.cells_with_colors[cell]
+            stack = [cell]
+            
+            while stack:
+                current = stack.pop()
+                if current in visited:
+                    continue
+                
+                if current in self.cells_with_colors and self.cells_with_colors[current] == color:
+                    visited.add(current)
+                    ship.append(current)
+                    
+                    r, c = current
+                    # preveri adjacent celice
+                    for dr, dc in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+                        neighbor = (r + dr, c + dc)
+                        if neighbor not in visited:
+                            stack.append(neighbor)
+            
+            if ship:
+                ships.append(ship)
+        
+        return ships
+
+
     def draw(self, surface, show_ships=False):
-        # Optional: show ship colors for one of the grids
         if show_ships:
-            for (r, c), color in self.cells_with_colors.items():
-                self.draw_cell_fill(surface, r, c, color)
+            self.draw_ship_images(surface)
+
 
         self.draw_grid(surface)
 

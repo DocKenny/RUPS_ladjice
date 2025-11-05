@@ -46,15 +46,18 @@ class MainMenu:
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit()
+                    self.selected_option = "quit"
+                    self.running = False
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self.start_rect.collidepoint(mouse_pos):
                         self.selected_option = "start"
                         self.running = False
+                    elif self.test_rect.collidepoint(mouse_pos):
+                        self.selected_option = "multiplayer"
+                        self.running = False
                     elif self.quit_rect.collidepoint(mouse_pos):
-                        pygame.quit()
-                        sys.exit()
+                        self.selected_option = "quit"
+                        self.running = False
 
             # Draw background
             self.screen.fill(self.BG_COLOR)
