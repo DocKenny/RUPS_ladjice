@@ -47,10 +47,10 @@ class MultiplayerMenu:
         self.connect_rect = pygame.Rect(0, 0, 200, 50)
         self.back2_rect = pygame.Rect(0, 0, 150, 50)
         
-        self.ip_rect.center = (cx, cy - 40)
-        self.port_rect.center = (cx, cy + 20)
-        self.connect_rect.center = (cx, cy + 100)
-        self.back2_rect.center = (cx, cy + 170)
+        self.ip_rect.center = (cx, cy - 70)
+        self.port_rect.center = (cx, cy + 30)
+        self.connect_rect.center = (cx, cy + 120)
+        self.back2_rect.center = (cx, cy + 190)
         
         self.mode = "main"  # "main", "join", "host_waiting"
     
@@ -78,7 +78,7 @@ class MultiplayerMenu:
         pygame.draw.rect(self.screen, bg_color, rect, border_radius=8)
         pygame.draw.rect(self.screen, border_color, rect, 2, border_radius=8)
         
-        text_surf = self.font_small.render(text, True, self.TEXT_COLOR)
+        text_surf = self.font_small.render(text, True, (0, 0, 0))
         text_rect = text_surf.get_rect(center=rect.center)
         self.screen.blit(text_surf, text_rect)
     

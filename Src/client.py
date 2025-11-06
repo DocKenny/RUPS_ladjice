@@ -5,16 +5,19 @@ import threading
 from board import Board
 from config import (GRID_PIXELS, SEQUENCE_COLORS, COLOR_BG, DEFAULT_PORT)
 from network_utils import send_json, receive_json, deserialize_board_state, deserialize_board_ships
+from toast import StatusToast
+from question_ui import QuestionCard
 
 # config
 OUTER_MARGIN = 30
 GAP_BETWEEN_GRIDS = 80
+TOP_BAR = 25
 
-LEFT_ORIGIN = (OUTER_MARGIN, OUTER_MARGIN)
-RIGHT_ORIGIN = (OUTER_MARGIN + GRID_PIXELS + GAP_BETWEEN_GRIDS, OUTER_MARGIN)
+LEFT_ORIGIN = (OUTER_MARGIN, TOP_BAR + OUTER_MARGIN)
+RIGHT_ORIGIN = (OUTER_MARGIN + GRID_PIXELS + GAP_BETWEEN_GRIDS, TOP_BAR + OUTER_MARGIN)
 
 WIDTH = RIGHT_ORIGIN[0] + GRID_PIXELS + OUTER_MARGIN
-HEIGHT = OUTER_MARGIN + GRID_PIXELS + 150
+HEIGHT = TOP_BAR + OUTER_MARGIN + GRID_PIXELS + OUTER_MARGIN + 100
 
 LABEL_COLOR = (60, 60, 60)
 
@@ -28,6 +31,9 @@ class BattleshipClient:
         self.font = pygame.font.SysFont(None, 28)
         self.font_large = pygame.font.SysFont(None, 36)
         self.running = True
+        
+        self.toast = StatusToast(self.screen)
+        self.question_card = QuestionCard(self.screen, width=700)
         
         # network
         self.host = host
@@ -103,6 +109,8 @@ class BattleshipClient:
             self.user_answer = ""
             self.state = "ANSWERING"
             self.message = f"Answer the question: {self.current_question}"
+            self.question_card.set_input("")
+            self.question_card.clear_feedback()
 
             
         elif msg_type == 'opponent_turn':
@@ -114,9 +122,13 @@ class BattleshipClient:
                 self.state = "SHOOTING"
                 self.message = msg['message']
                 self.can_shoot = True
+                self.question_card.set_feedback(True, "Correct! Fire away 🚀")
+                self.toast.show("Correct! Take your shot.", positive=True)
             else:
                 self.state = "SHOW_RESULT"
                 self.message = msg['message']
+                self.question_card.set_feedback(False, "Wrong answer. Turn lost.")
+                self.toast.show("Wrong answer. Turn lost.", positive=False)
                 pygame.time.set_timer(pygame.USEREVENT, 2000, 1)
                 
         elif msg_type == 'shot_result':
@@ -177,17 +189,23 @@ class BattleshipClient:
                     
             elif self.state == "ANSWERING":
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_RETURN:
+                    action = self.question_card.handle_key(event)
+                    if action == "submit":
                         self.send_message({
                             'type': 'answer',
-                            'answer': self.user_answer
+                            'answer': self.question_card.input_value
                         })
                         self.state = "WAITING"
                         self.message = "Answer submitted. Waiting for result..."
-                    elif event.key == pygame.K_BACKSPACE:
-                        self.user_answer = self.user_answer[:-1]
-                    else:
-                        self.user_answer += event.unicode
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    action = self.question_card.handle_click(event.pos)
+                    if action == "submit":
+                        self.send_message({
+                            'type': 'answer',
+                            'answer': self.question_card.input_value
+                        })
+                        self.state = "WAITING"
+                        self.message = "Answer submitted. Waiting for result..."
                         
             elif self.state == "SHOOTING" and event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1 and self.can_shoot and self.opponent_board:
@@ -225,20 +243,19 @@ class BattleshipClient:
                 self.screen.blit(label, (RIGHT_ORIGIN[0], RIGHT_ORIGIN[1] - 25))
                 self.opponent_board.draw(self.screen, show_ships=False)
             
-            y_pos = OUTER_MARGIN + GRID_PIXELS + 40
-            
             if self.state == "ANSWERING":
-                self.draw_text_center(self.current_question, y_pos)
-                self.draw_text_center(f"Your answer: {self.user_answer}", y_pos + 35)
-                self.draw_text_center("Press ENTER to submit", y_pos + 70, color=(100, 100, 100))
-            elif self.state == "SHOOTING":
-                self.draw_text_center(self.message, y_pos, color=(40, 120, 40))
-                self.draw_text_center("Click on opponent's board to shoot!", y_pos + 35)
+                overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
+                overlay.fill((0, 0, 0, 80))
+                self.screen.blit(overlay, (0, 0))
+                
+                center = (self.screen.get_width() // 2, self.screen.get_height() // 2)
+                self.question_card.draw(self.current_question, center)
             elif self.state == "GAME_OVER":
+                y_pos = TOP_BAR + OUTER_MARGIN + GRID_PIXELS + 40
                 self.draw_text_center(self.message, y_pos, self.font_large, 
                                      (200, 40, 40) if self.winner != self.player_name else (40, 120, 40))
-            else:
-                self.draw_text_center(self.message, y_pos)
+            
+            self.toast.draw()
         
         pygame.display.flip()
     

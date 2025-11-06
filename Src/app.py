@@ -156,7 +156,6 @@ class App:
 
         # HUD on top
         self.hud.draw()
-        self.toast.draw()
 
         # Draw both boards
         player.board.origin = LEFT_ORIGIN
@@ -179,6 +178,8 @@ class App:
 
         elif self.state == "SHOOTING":
             self.draw_text_center(self.message, HEIGHT - 80)
+
+        self.toast.draw()
 
         pygame.display.flip()
 
