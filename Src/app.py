@@ -30,6 +30,8 @@ SEQUENCE_COLORS = [
     (189, 226, 255),  # light blue
     (255, 235, 205),  # light bisque
     (221, 197, 255),  # light purple
+    (189, 226, 255),
+    (189, 226, 255),
 ]
 
 
@@ -52,7 +54,7 @@ class App:
         self.toast = StatusToast(self.screen)
 
         # make the game (players; Game handles ship placement)
-        self.game = Game(["Player 1", "Player 2"], SEQUENCE_COLORS, ship_lengths=[2, 3, 5], grid_size=GRID_SIZE)
+        self.game = Game(["Player 1", "Player 2"], SEQUENCE_COLORS, ship_lengths=[2, 2, 3, 3, 5], grid_size=GRID_SIZE)
 
         # set origins so boards draw in the right place
         # (Game created Board objects with origin=(0,0) so update the origins here)

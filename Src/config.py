@@ -5,7 +5,7 @@ LINE_WIDTH = 2
 X_MARGIN = 8
 GRID_PIXELS = GRID_SIZE * CELL_SIZE
 
-SHIP_LENGTHS = [2, 3, 5]
+SHIP_LENGTHS = [2, 2, 3, 3, 5]
 
 #ui barve
 COLOR_BG = (245, 245, 245)
@@ -23,6 +23,8 @@ SEQUENCE_COLORS = [
     (189, 226, 255),
     (255, 235, 205),
     (221, 197, 255),
+    (189, 226, 255),
+    (189, 226, 255),
 ]
 
 #network
